@@ -9,59 +9,33 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type Config struct {
-	PORT, DB_URL                           string
-	SET_MAX_IDLE_CONNS, SET_MAX_OPEN_CONNS int
-	SET_CONN_MAX_IDLE_TIME                 time.Duration
-}
-
-func Load() *Config {
-
+func init() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = ":5300"
-	}
-
-	db_url := os.Getenv("DB_URL")
-	if db_url == "" {
-		log.Fatal("DB_URL not set")
-	}
-
-	maxIdleConns, err := strconv.Atoi(os.Getenv("SET_MAX_IDLE_CONNS"))
-	if err != nil {
-		log.Println("Invalid SET_MAX_IDLE_CONNS value, defaulting to 10")
-		maxIdleConns = 10
-	}
-
-	maxOpenConns, err := strconv.Atoi(os.Getenv("SET_MAX_OPEN_CONNS"))
-	if err != nil {
-		log.Println("Invalid SET_MAX_OPEN_CONNS value, defaulting to 100")
-		maxOpenConns = 100
-	}
-
-	connMaxIdleTime, err := time.ParseDuration(os.Getenv("SET_CONN_MAX_IDLE_TIME"))
-	if err != nil {
-		log.Println("Invalid SET_CONNS_MAX_IDLE_TIME value, defaulting to 40m")
-		connMaxIdleTime = 40 * time.Minute
-	}
-
-	return &Config{
-		PORT:                   ":" + port,
-		DB_URL:                 db_url,
-		SET_MAX_IDLE_CONNS:     maxIdleConns,
-		SET_MAX_OPEN_CONNS:     maxOpenConns,
-		SET_CONN_MAX_IDLE_TIME: connMaxIdleTime,
+		log.Println("Error loading .env file")
 	}
 }
 
-// func mustAtoi(s string) int {
-// 	i, err := strconv.Atoi(s)
-// 	if err != nil {
-// 		panic("Invalid integer: " + s)
-// 	}
-// 	return i
-// }
+func GetEnvString(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
+}
+
+func GetEnvInt(key string, defaultValue int) int {
+	if value, exists := os.LookupEnv(key); exists {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func GetEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value, exists := os.LookupEnv(key); exists {
+		if tdValue, err := time.ParseDuration(value); err == nil {
+			return tdValue
+		}
+	}
+	return defaultValue
+}

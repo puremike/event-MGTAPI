@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
 )
 
@@ -26,6 +25,5 @@ func ConnectPostgresDB(db_url string, maxIdleConns, maxOpenConns int, connMaxIdl
 		return nil, err
 	}
 
-	log.Println("DB connection opened successfully")
 	return db, nil
 }
