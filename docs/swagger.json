@@ -1,0 +1,19 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is an API for event management",
+        "title": "Event Management API",
+        "contact": {
+            "name": "Puremike",
+            "url": "http://github.com/puremike",
+            "email": "digitalmarketfy@gmail.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {}
+}
