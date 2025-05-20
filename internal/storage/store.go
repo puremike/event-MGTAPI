@@ -1,6 +1,10 @@
 package storage
 
-import "database/sql"
+import (
+	"database/sql"
+	"errors"
+	"time"
+)
 
 type Storage struct {
 	Users     UserModel
@@ -15,3 +19,10 @@ func NewStorage(db *sql.DB) *Storage {
 		Attendees: AttendeeModel{db},
 	}
 }
+
+var (
+	QueryTimeOutDuration = 5 * time.Second
+	ErrEventNotFound     = errors.New("event not found")
+	ErrUserNotFound      = errors.New("user not found")
+	ErrAttendeeNotFound  = errors.New("attendee not found")
+)

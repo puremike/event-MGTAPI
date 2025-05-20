@@ -5,6 +5,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/puremike/event-mgt-api/docs"
 	"github.com/puremike/event-mgt-api/internal/db"
 	"github.com/puremike/event-mgt-api/internal/env"
 	"github.com/puremike/event-mgt-api/internal/storage"
@@ -29,20 +30,22 @@ type dbconfig struct {
 	connMaxIdleTime            time.Duration
 }
 
-// @title           Event Management API
-// @version         1.0
-// @description     This is an API for event management
+//	@title			Event Management API
+//	@version		1.0
+//	@description	This is an API for event management
 
-// @contact.name   Puremike
-// @contact.url    http://github.com/puremike
-// @contact.email  digitalmarketfy@gmail.com
+//	@contact.name	Puremike
+//	@contact.url	http://github.com/puremike
+//	@contact.email	digitalmarketfy@gmail.com
 
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+//	@license.name	Apache 2.0
+//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @BasePath  /api/v1
+//	@BasePath	/api/v1
 
 func main() {
+
+	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	cfg := &config{port: env.GetEnvString("PORT", "5300"), env: env.GetEnvString("ENV", "development"),
 		dbconfig: dbconfig{

@@ -1,12 +1,11 @@
 package env
 
 import (
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
 func init() {

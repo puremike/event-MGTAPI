@@ -8,33 +8,149 @@ import (
 
 type Event struct {
 	ID          int       `json:"id"`
-	OwnerID     string    `json:"ownerId" binding:"required"`
-	Name        string    `json:"name" binding:"required,min=3"`
-	Description string    `json:"description" binding:"required,min=10"`
-	Date        time.Time `json:"date" binding:"required,datetime=2006-01-02"`
-	Location    string    `json:"location" binding:"required,min=3"`
+	OwnerID     int       `json:"owner_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Date        time.Time `json:"date"`
+	Location    string    `json:"location"`
 }
 
 type EventModel struct {
 	db *sql.DB
 }
 
-func (e *EventModel) CreateEvent(ctx context.Context, event *Event) (*Event, error) {
-	return nil, nil
+func (e *EventModel) CreateEvent(ctx context.Context, event *Event) error {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
+	defer cancel()
+
+	query := `INSERT INTO events (owner_id, name, description, date, location) VALUES ($1, $2, $3, $4, $5) RETURNING id, owner_id, name, description, date, location`
+
+	tx, err := e.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	err = tx.QueryRowContext(ctx, query, event.OwnerID, event.Name, event.Description, event.Date, event.Location).Scan(&event.ID, &event.OwnerID, &event.Name, &event.Description, &event.Date, &event.Location)
+
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return nil
 }
 
-func (e *EventModel) GetEventByID(ctx context.Context, id int) (*Event, error) {
-	return &Event{}, nil
+func (e *EventModel) GetEventByID(ctx context.Context, eventId int) (*Event, error) {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
+	defer cancel()
+
+	query := `SELECT id, owner_id, name, description, date, location FROM events WHERE id = $1`
+
+	event := &Event{}
+
+	err := e.db.QueryRowContext(ctx, query, eventId).Scan(&event.ID, &event.OwnerID, &event.Name, &event.Description, &event.Date, &event.Location)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrEventNotFound
+		}
+		return nil, err
+	}
+	return event, nil
 }
 
 func (e *EventModel) GetAllEvents(ctx context.Context) (*[]Event, error) {
-	return nil, nil
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
+	defer cancel()
+
+	query := `SELECT id, owner_id, name, description, date, location FROM events`
+
+	var events []Event
+
+	rows, err := e.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e Event
+		if err = rows.Scan(&e.ID, &e.OwnerID, &e.Name, &e.Description, &e.Date, &e.Location); err != nil {
+			return nil, err
+		}
+
+		events = append(events, e)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &events, nil
 }
 
-func (e *EventModel) UpdateEvent(ctx context.Context, event *Event, id int) (*Event, error) {
-	return nil, nil
+func (e *EventModel) UpdateEvent(ctx context.Context, event *Event, eventId int) (*Event, error) {
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
+	defer cancel()
+
+	query := `UPDATE events SET name = $1, description = $2, date = $3, location = $4 WHERE id = $5 RETURNING name, description, date, location`
+
+	tx, err := e.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.QueryRowContext(ctx, query, event.Name, event.Description, event.Date, event.Location, eventId).Scan(&event.Name, &event.Description, &event.Date, &event.Location)
+
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return event, nil
 }
 
-func (e *EventModel) DeleteEvent(ctx context.Context, id int) error {
+func (e *EventModel) DeleteEvent(ctx context.Context, eventId int) error {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
+	defer cancel()
+
+	query := `DELETE FROM events WHERE id = $1`
+	tx, err := e.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	result, err := tx.ExecContext(ctx, query, eventId)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if rows == 0 {
+		tx.Rollback()
+		return ErrEventNotFound
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	return nil
 }
