@@ -5,12 +5,14 @@ import (
 	"log"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
 	"github.com/puremike/event-mgt-api/docs"
 	"github.com/puremike/event-mgt-api/internal/auth"
 	"github.com/puremike/event-mgt-api/internal/db"
 	"github.com/puremike/event-mgt-api/internal/env"
 	"github.com/puremike/event-mgt-api/internal/storage"
+	"github.com/puremike/event-mgt-api/internal/storage/cache"
 	"go.uber.org/zap"
 )
 
@@ -18,14 +20,22 @@ type application struct {
 	config           *config
 	store            *storage.Storage
 	logger           *zap.SugaredLogger
-	JWTAuthenticator *auth.JWTAuthenticator
+	jWTAuthenticator *auth.JWTAuthenticator
+	cacheStorage     *cache.CacheStorage
 }
 
 type config struct {
-	port       string
-	env        string
-	dbconfig   dbconfig
-	authConfig authConfig
+	port              string
+	env               string
+	dbconfig          dbconfig
+	authConfig        authConfig
+	redisClientConfig redisClientConfig
+}
+
+type redisClientConfig struct {
+	addr, pw string
+	db       int
+	enabled  bool
 }
 
 type authConfig struct {
@@ -67,8 +77,13 @@ func main() {
 		dbconfig: dbconfig{
 			db_url: env.GetEnvString("DB_URL", "postgres://postgres:postgress123@localhost/EventMGTAPI?sslmode=disable"), maxIdleConns: env.GetEnvInt("SET_MAX_IDLE_CONNS", 8), maxOpenConns: env.GetEnvInt("SET_MAX_OPEN_CONNS", 50), connMaxIdleTime: env.GetEnvDuration("SET_CONN_MAX_IDLE_TIME", 20*time.Minute),
 		}, authConfig: authConfig{
-			secretKey: env.GetEnvString("JWT_SECRET_KEY", "HKSHD7923B799B08409023N988"), iss: env.GetEnvString("JWT_ISS", "event-mgt-api"), aud: env.GetEnvString("JWT_AUD", "event-mgt-api"), tokenExp: env.GetEnvDuration("JWT_TOKEN_EXP", 72*time.Hour), username: env.GetEnvString("BASIC_AUTH_USERNAME", "admin"), password: env.GetEnvString("BASIC_AUTH_PASSWORD", "password"),
-		}}
+			secretKey: env.GetEnvString("JWT_SECRET_KEY", "HKSHD7923B799B08409023N988"), iss: env.GetEnvString("JWT_ISS", "event-mgt-api"), aud: env.GetEnvString("JWT_AUD", "event-mgt-api"), tokenExp: env.GetEnvDuration("JWT_TOKEN_EXP", 72*time.Hour), username: env.GetEnvString("BASIC_AUTH_USERNAME", "admin"), password: env.GetEnvString("BASIC_AUTH_PASSWORD", "password")},
+		redisClientConfig: redisClientConfig{
+			addr:    env.GetEnvString("REDIS_ADDR", "localhost:6379"),
+			pw:      env.GetEnvString("REDIS_PW", ""),
+			db:      env.GetEnvInt("REDIS_DB", 0),
+			enabled: env.GetEnvBool("REDIS_ENABLED", false)},
+	}
 
 	db, err := db.ConnectPostgresDB(cfg.dbconfig.db_url, cfg.dbconfig.maxIdleConns, cfg.dbconfig.maxOpenConns, cfg.dbconfig.connMaxIdleTime)
 
@@ -82,11 +97,20 @@ func main() {
 
 	logger.Info("DB connection opened successfully")
 
+	var rdb *redis.Client
+	if cfg.redisClientConfig.enabled {
+
+		rdb = cache.NewRedisClient(cfg.redisClientConfig.addr, cfg.redisClientConfig.pw, cfg.redisClientConfig.db)
+
+		logger.Info("Redis connection opened successfully")
+	}
+
 	app := application{
 		config:           cfg,
 		store:            storage.NewStorage(db),
 		logger:           logger,
-		JWTAuthenticator: auth.NewJWTAuthenticator(cfg.authConfig.secretKey, cfg.authConfig.iss, cfg.authConfig.aud),
+		jWTAuthenticator: auth.NewJWTAuthenticator(cfg.authConfig.secretKey, cfg.authConfig.iss, cfg.authConfig.aud),
+		cacheStorage:     cache.NewCacheStorage(rdb),
 	}
 
 	expvar.Publish("database", expvar.Func(func() any {

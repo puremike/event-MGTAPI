@@ -6,7 +6,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-type AttendeeModel struct {
+type AttendeeStore struct {
 	db *sql.DB
 }
 
@@ -16,7 +16,7 @@ type Attendee struct {
 	EventID int `json:"event_id"`
 }
 
-func (a *AttendeeModel) CreateAttendee(ctx context.Context, attendee *Attendee) error {
+func (a *AttendeeStore) CreateAttendee(ctx context.Context, attendee *Attendee) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -38,7 +38,7 @@ func (a *AttendeeModel) CreateAttendee(ctx context.Context, attendee *Attendee) 
 	return nil
 }
 
-func (a *AttendeeModel) GetByEventAndAttendee(ctx context.Context, eventId, userId int) (*Attendee, error) {
+func (a *AttendeeStore) GetByEventAndAttendee(ctx context.Context, eventId, userId int) (*Attendee, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -57,7 +57,7 @@ func (a *AttendeeModel) GetByEventAndAttendee(ctx context.Context, eventId, user
 	return attendee, nil
 }
 
-func (a *AttendeeModel) GetAttendeesByEvent(ctx context.Context, eventId int) (*[]User, error) {
+func (a *AttendeeStore) GetAttendeesByEvent(ctx context.Context, eventId int) (*[]User, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -88,7 +88,7 @@ func (a *AttendeeModel) GetAttendeesByEvent(ctx context.Context, eventId int) (*
 	return &users, nil
 }
 
-func (a *AttendeeModel) DeleteAttendee(ctx context.Context, eventId, userId int) error {
+func (a *AttendeeStore) DeleteAttendee(ctx context.Context, eventId, userId int) error {
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
@@ -125,7 +125,7 @@ func (a *AttendeeModel) DeleteAttendee(ctx context.Context, eventId, userId int)
 
 }
 
-func (a *AttendeeModel) GetEventsOfAttendee(ctx context.Context, userId int) (*[]Event, error) {
+func (a *AttendeeStore) GetEventsOfAttendee(ctx context.Context, userId int) (*[]Event, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 

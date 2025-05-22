@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"net/http"
@@ -69,7 +70,7 @@ func (app *application) AuthMiddleware() gin.HandlerFunc {
 
 		token := strings.TrimSpace(parts[1])
 
-		jwtToken, err := app.JWTAuthenticator.ValidateToken(token)
+		jwtToken, err := app.jWTAuthenticator.ValidateToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()
@@ -90,13 +91,8 @@ func (app *application) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		user, err := app.store.Users.GetUserByID(c.Request.Context(), int(userId))
+		user, err := app.getUserFromCache(c.Request.Context(), int(userId))
 		if err != nil {
-			if errors.Is(err, storage.ErrUserNotFound) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
-				c.Abort()
-				return
-			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
 			c.Abort()
 			return
@@ -106,6 +102,35 @@ func (app *application) AuthMiddleware() gin.HandlerFunc {
 		c.Set("userId", user.ID)
 		c.Next()
 	}
+}
+
+func (app *application) getUserFromCache(ctx context.Context, id int) (*storage.User, error) {
+
+	if !app.config.redisClientConfig.enabled {
+		return app.store.Users.GetUserByID(ctx, id)
+	}
+	app.logger.Infow("cache hit", "key", "id", id)
+
+	user, err := app.cacheStorage.Users.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if user == nil {
+		app.logger.Infow("fetching user from DB", "key", "id", id)
+		user, err := app.store.Users.GetUserByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, storage.ErrUserNotFound) {
+				return nil, storage.ErrUserNotFound
+			}
+			return nil, err
+		}
+		if err := app.cacheStorage.Users.Set(ctx, user); err != nil {
+			app.logger.Errorw("failed to set user in cache", "key", "id", id, "error", err)
+		}
+		return user, nil
+	}
+	return user, nil
 }
 
 func (app *application) eventContextMiddleWare() gin.HandlerFunc {
@@ -118,14 +143,9 @@ func (app *application) eventContextMiddleWare() gin.HandlerFunc {
 			return
 		}
 
-		event, err := app.store.Events.GetEventByID(c.Request.Context(), eventId)
+		event, err := app.getEventFromCache(c.Request.Context(), eventId)
 
 		if err != nil {
-			if errors.Is(err, storage.ErrEventNotFound) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
-				c.Abort()
-				return
-			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve event"})
 			c.Abort()
 			return
@@ -133,4 +153,33 @@ func (app *application) eventContextMiddleWare() gin.HandlerFunc {
 		c.Set("event", event)
 		c.Next()
 	}
+}
+
+func (app *application) getEventFromCache(ctx context.Context, id int) (*storage.Event, error) {
+
+	if !app.config.redisClientConfig.enabled {
+		return app.store.Events.GetEventByID(ctx, id)
+	}
+	app.logger.Infow("cache hit", "key", "id", id)
+
+	event, err := app.cacheStorage.Events.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if event == nil {
+		app.logger.Infow("fetching event from DB", "key", "id", id)
+		event, err := app.store.Events.GetEventByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, storage.ErrEventNotFound) {
+				return nil, storage.ErrEventNotFound
+			}
+			return nil, err
+		}
+		if err := app.cacheStorage.Events.Set(ctx, event); err != nil {
+			app.logger.Errorw("failed to set event in cache", "key", "id", id, "error", err)
+		}
+		return event, nil
+	}
+	return event, nil
 }

@@ -6,7 +6,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-type UserModel struct {
+type UserStore struct {
 	db *sql.DB
 }
 
@@ -17,7 +17,7 @@ type User struct {
 	Password string `json:"_"`
 }
 
-func (u *UserModel) CreateUser(ctx context.Context, user *User) error {
+func (u *UserStore) CreateUser(ctx context.Context, user *User) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -41,7 +41,7 @@ func (u *UserModel) CreateUser(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (u *UserModel) GetUserByID(ctx context.Context, userId int) (*User, error) {
+func (u *UserStore) GetUserByID(ctx context.Context, userId int) (*User, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -58,7 +58,7 @@ func (u *UserModel) GetUserByID(ctx context.Context, userId int) (*User, error) 
 	return user, nil
 }
 
-func (u *UserModel) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+func (u *UserStore) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 

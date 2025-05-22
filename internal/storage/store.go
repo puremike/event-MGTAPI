@@ -7,16 +7,16 @@ import (
 )
 
 type Storage struct {
-	Users     UserModel
-	Events    EventModel
-	Attendees AttendeeModel
+	Users     UserStore
+	Events    EventStore
+	Attendees AttendeeStore
 }
 
 func NewStorage(db *sql.DB) *Storage {
 	return &Storage{
-		Users:     UserModel{db},
-		Events:    EventModel{db},
-		Attendees: AttendeeModel{db},
+		Users:     UserStore{db},
+		Events:    EventStore{db},
+		Attendees: AttendeeStore{db},
 	}
 }
 

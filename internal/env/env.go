@@ -1,11 +1,12 @@
 package env
 
 import (
-	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func init() {
@@ -34,6 +35,15 @@ func GetEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	if value, exists := os.LookupEnv(key); exists {
 		if tdValue, err := time.ParseDuration(value); err == nil {
 			return tdValue
+		}
+	}
+	return defaultValue
+}
+
+func GetEnvBool(key string, defaultValue bool) bool {
+	if value, exists := os.LookupEnv(key); exists {
+		if valueBool, err := strconv.ParseBool(value); err == nil {
+			return valueBool
 		}
 	}
 	return defaultValue

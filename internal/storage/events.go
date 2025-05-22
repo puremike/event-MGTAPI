@@ -15,11 +15,11 @@ type Event struct {
 	Location    string    `json:"location"`
 }
 
-type EventModel struct {
+type EventStore struct {
 	db *sql.DB
 }
 
-func (e *EventModel) CreateEvent(ctx context.Context, event *Event) error {
+func (e *EventStore) CreateEvent(ctx context.Context, event *Event) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -45,7 +45,7 @@ func (e *EventModel) CreateEvent(ctx context.Context, event *Event) error {
 	return nil
 }
 
-func (e *EventModel) GetEventByID(ctx context.Context, eventId int) (*Event, error) {
+func (e *EventStore) GetEventByID(ctx context.Context, eventId int) (*Event, error) {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
@@ -63,7 +63,7 @@ func (e *EventModel) GetEventByID(ctx context.Context, eventId int) (*Event, err
 	return event, nil
 }
 
-func (e *EventModel) GetAllEvents(ctx context.Context) (*[]Event, error) {
+func (e *EventStore) GetAllEvents(ctx context.Context) (*[]Event, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
@@ -93,7 +93,7 @@ func (e *EventModel) GetAllEvents(ctx context.Context) (*[]Event, error) {
 	return &events, nil
 }
 
-func (e *EventModel) UpdateEvent(ctx context.Context, event *Event, eventId int) (*Event, error) {
+func (e *EventStore) UpdateEvent(ctx context.Context, event *Event, eventId int) (*Event, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
@@ -120,7 +120,7 @@ func (e *EventModel) UpdateEvent(ctx context.Context, event *Event, eventId int)
 	return event, nil
 }
 
-func (e *EventModel) DeleteEvent(ctx context.Context, eventId int) error {
+func (e *EventStore) DeleteEvent(ctx context.Context, eventId int) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 

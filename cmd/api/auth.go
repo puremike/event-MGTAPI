@@ -78,7 +78,7 @@ func (app *application) loginUser(c *gin.Context) {
 		"aud": app.config.authConfig.aud,
 	}
 
-	token, err := app.JWTAuthenticator.GenerateToken(claims)
+	token, err := app.jWTAuthenticator.GenerateToken(claims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
