@@ -3,14 +3,27 @@ package main
 import (
 	"expvar"
 	"net/http"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/puremike/event-mgt-api/internal/env"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func (app *application) routes() http.Handler {
 	g := gin.Default()
+
+	// Add CORS middleware
+	g.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{env.GetEnvString("CORS_ALLOWED_ORIGIN", "https://yourfrontend.com")},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	g.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
