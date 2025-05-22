@@ -106,4 +106,4 @@ Pull requests are welcome! Please open issues for suggestions or bugs.
 
 ---
 
-Let me know if you want to add usage examples, environment variable details, or anything else!
+Let me know if you want to add usage examples, environment variables, or anything else!
