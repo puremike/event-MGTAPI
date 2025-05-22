@@ -23,14 +23,14 @@ func (e *EventModel) CreateEvent(ctx context.Context, event *Event) error {
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
-	query := `INSERT INTO events (owner_id, name, description, date, location) VALUES ($1, $2, $3, $4, $5) RETURNING id, owner_id, name, description, date, location`
+	query := `INSERT INTO events (owner_id, name, description, date, location) VALUES ($1, $2, $3, $4, $5) RETURNING owner_id, name, description, date, location`
 
 	tx, err := e.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	err = tx.QueryRowContext(ctx, query, event.OwnerID, event.Name, event.Description, event.Date, event.Location).Scan(&event.ID, &event.OwnerID, &event.Name, &event.Description, &event.Date, &event.Location)
+	err = tx.QueryRowContext(ctx, query, event.OwnerID, event.Name, event.Description, event.Date, event.Location).Scan(&event.OwnerID, &event.Name, &event.Description, &event.Date, &event.Location)
 
 	if err != nil {
 		tx.Rollback()
@@ -98,14 +98,14 @@ func (e *EventModel) UpdateEvent(ctx context.Context, event *Event, eventId int)
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
-	query := `UPDATE events SET name = $1, description = $2, date = $3, location = $4 WHERE id = $5 RETURNING name, description, date, location`
+	query := `UPDATE events SET name = $1, description = $2, date = $3, location = $4 WHERE id = $5 RETURNING owner_id, name, description, date, location`
 
 	tx, err := e.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = tx.QueryRowContext(ctx, query, event.Name, event.Description, event.Date, event.Location, eventId).Scan(&event.Name, &event.Description, &event.Date, &event.Location)
+	err = tx.QueryRowContext(ctx, query, event.Name, event.Description, event.Date, event.Location, eventId).Scan(&event.OwnerID, &event.Name, &event.Description, &event.Date, &event.Location)
 
 	if err != nil {
 		tx.Rollback()

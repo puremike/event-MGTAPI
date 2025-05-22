@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,14 +10,20 @@ import (
 	"github.com/puremike/event-mgt-api/internal/storage"
 )
 
-type CreateEventRequest struct {
+type createEventRequest struct {
 	Name        string `json:"name" binding:"required,min=3"`
 	Description string `json:"description" binding:"required,min=10"`
 	Date        string `json:"date" binding:"required,datetime=2006-01-02"`
 	Location    string `json:"location" binding:"required,min=3"`
 }
 
-var r = rand.New(rand.NewSource(time.Now().UnixNano()))
+type eventResponse struct {
+	OwnerID     int    `json:"owner_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Date        string `json:"date"`
+	Location    string `json:"location"`
+}
 
 // CreateEvent godoc
 //
@@ -27,15 +32,16 @@ var r = rand.New(rand.NewSource(time.Now().UnixNano()))
 //	@Tags			Events
 //	@Accept			json
 //	@Produce		json
-//	@Param			payload	body		CreateEventRequest	true	"Event payload"
+//	@Param			payload	body		createEventRequest	true	"Event payload"
 //	@Success		200		{object}	storage.Event
 //	@Failure		400		{object}	error
 //	@Failure		404		{object}	error
 //	@Failure		500		{object}	error
 //	@Router			/events [post]
+//	@Security		BearerAuth
 func (app *application) createEvent(c *gin.Context) {
 
-	var payload CreateEventRequest
+	var payload createEventRequest
 
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -49,7 +55,7 @@ func (app *application) createEvent(c *gin.Context) {
 	}
 
 	event := &storage.Event{
-		OwnerID:     r.Intn(3),
+		OwnerID:     c.GetInt("userId"),
 		Name:        payload.Name,
 		Description: payload.Description,
 		Date:        date,
@@ -78,24 +84,7 @@ func (app *application) createEvent(c *gin.Context) {
 //	@Failure		500	{object}	error
 //	@Router			/events/{id} [get]
 func (app *application) getEventById(c *gin.Context) {
-
-	eventId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid eventID"})
-		return
-	}
-	event, err := app.store.Events.GetEventByID(c.Request.Context(), eventId)
-
-	if err != nil {
-		if errors.Is(err, storage.ErrEventNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
-			return
-		}
-		app.logger.Errorf("failed to retrieve event: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve event"})
-		return
-	}
-
+	event := app.getEventFromContext(c)
 	c.JSON(http.StatusOK, event)
 }
 
@@ -128,47 +117,62 @@ func (app *application) getAllEvents(c *gin.Context) {
 //	@Tags			Events
 //	@Accept			json
 //	@Produce		json
-//	@Param			payload	body		CreateEventRequest	true	"Event payload"
+//	@Param			payload	body		createEventRequest	true	"Event payload"
 //	@Param			id		path		int					true	"Event ID"
 //
-//	@Success		200		{object}	storage.Event
+//	@Success		200		{object}	eventResponse	"Event successfully updated"
 //	@Failure		400		{object}	error
 //	@Failure		404		{object}	error
 //	@Failure		500		{object}	error
 //	@Router			/events/{id} [put]
+//	@Security		BearerAuth
 func (app *application) updateEvent(c *gin.Context) {
 
-	eventId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid eventID"})
-		return
-	}
-
-	var payload CreateEventRequest
-
-	date, _ := time.Parse("2006-01-02", payload.Date)
-
+	var payload createEventRequest
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// parsing the date
+	date, err := time.Parse("2006-01-02", payload.Date)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format, expected YYYY-MM-DD"})
+		return
+	}
+
+	user := app.getUserFromContext(c)
+	existingEvent := app.getEventFromContext(c)
+
+	if existingEvent.OwnerID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you are not authorized to update this event"})
+		return
+	}
+
 	event := &storage.Event{
-		OwnerID:     r.Intn(500),
+		OwnerID:     user.ID,
 		Name:        payload.Name,
 		Description: payload.Description,
 		Date:        date,
 		Location:    payload.Location,
 	}
 
-	updatedEvent, err := app.store.Events.UpdateEvent(c.Request.Context(), event, eventId)
+	updatedEvent, err := app.store.Events.UpdateEvent(c.Request.Context(), event, existingEvent.ID)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update event"})
 		return
 	}
 
-	c.JSON(http.StatusOK, updatedEvent)
+	response := eventResponse{
+		OwnerID:     updatedEvent.OwnerID,
+		Name:        updatedEvent.Name,
+		Description: updatedEvent.Description,
+		Date:        updatedEvent.Date.Format("2006-01-02"),
+		Location:    updatedEvent.Location,
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // DeleteEvent godoc
@@ -185,15 +189,18 @@ func (app *application) updateEvent(c *gin.Context) {
 //	@Failure		404	{object}	error
 //	@Failure		500	{object}	error
 //	@Router			/events/{id} [delete]
+//	@Security		BearerAuth
 func (app *application) deleteEvent(c *gin.Context) {
 
-	eventId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid eventID"})
+	existingEvent := app.getEventFromContext(c)
+	user := app.getUserFromContext(c)
+
+	if existingEvent.OwnerID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you are not authorized to delete this event"})
 		return
 	}
 
-	if err := app.store.Events.DeleteEvent(c.Request.Context(), eventId); err != nil {
+	if err := app.store.Events.DeleteEvent(c.Request.Context(), existingEvent.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete event"})
 		return
 	}
@@ -216,10 +223,14 @@ func (app *application) deleteEvent(c *gin.Context) {
 //	@Failure		409		{object}	map[string]string	"Attendee already exists"
 //	@Failure		500		{object}	map[string]string	"Internal server error"
 //	@Router			/events/{id}/attendees/{userId} [post]
+//	@Security		BearerAuth
 func (app *application) addAttendeeToEvent(c *gin.Context) {
-	eventId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event ID"})
+	event := app.getEventFromContext(c)
+	authUser := app.getUserFromContext(c)
+
+	// only authorized event owner can add attendees to the event
+	if event.OwnerID != authUser.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you are not authorized to add attendees to this event"})
 		return
 	}
 
@@ -229,20 +240,7 @@ func (app *application) addAttendeeToEvent(c *gin.Context) {
 		return
 	}
 
-	event, err := app.store.Events.GetEventByID(c.Request.Context(), eventId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve event"})
-		return
-	}
-
-	user, err := app.store.Users.GetUserByID(c.Request.Context(), userId)
-	if err != nil {
-		app.logger.Errorf("failed to retrieve attendee: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user"})
-		return
-	}
-
-	existingAttendee, err := app.store.Attendees.GetByEventAndAttendee(c.Request.Context(), event.ID, user.ID)
+	existingAttendee, err := app.store.Attendees.GetByEventAndAttendee(c.Request.Context(), event.ID, userId)
 	if err != nil && !errors.Is(err, storage.ErrAttendeeNotFound) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve attendee"})
 		return
@@ -253,7 +251,7 @@ func (app *application) addAttendeeToEvent(c *gin.Context) {
 	}
 
 	attendee := &storage.Attendee{
-		UserID:  user.ID,
+		UserID:  userId,
 		EventID: event.ID,
 	}
 
@@ -308,20 +306,25 @@ func (app *application) getEventAttendees(c *gin.Context) {
 //	@Failure		404		{object}	error
 //	@Failure		500		{object}	error
 //	@Router			/events/{id}/attendees/{userId} [delete]
+//	@Security		BearerAuth
 func (app *application) deleteAttendeeFromEvent(c *gin.Context) {
 
-	eventId, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event ID"})
+	event := app.getEventFromContext(c)
+	authUser := app.getUserFromContext(c)
+
+	// only authorized event owner can add attendees to the event
+	if event.OwnerID != authUser.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you are not authorized to delete attendee to this event"})
 		return
 	}
+
 	userId, err := strconv.Atoi(c.Param("userId"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
 	}
 
-	attendee, err := app.store.Attendees.GetByEventAndAttendee(c.Request.Context(), eventId, userId)
+	attendee, err := app.store.Attendees.GetByEventAndAttendee(c.Request.Context(), event.ID, userId)
 	if err != nil {
 		if errors.Is(err, storage.ErrAttendeeNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "attendee not found"})

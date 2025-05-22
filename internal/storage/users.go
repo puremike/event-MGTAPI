@@ -45,10 +45,27 @@ func (u *UserModel) GetUserByID(ctx context.Context, userId int) (*User, error) 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
 	defer cancel()
 
-	query := `SELECT id, name, email FROM users WHERE id = $1`
+	query := `SELECT id, name, email, password FROM users WHERE id = $1`
 
 	user := &User{}
-	if err := u.db.QueryRowContext(ctx, query, userId).Scan(&user.ID, &user.Name, &user.Email); err != nil {
+	if err := u.db.QueryRowContext(ctx, query, userId).Scan(&user.ID, &user.Name, &user.Email, &user.Password); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (u *UserModel) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeOutDuration)
+	defer cancel()
+
+	query := `SELECT id, name, email, password FROM users WHERE email = $1`
+
+	user := &User{}
+	if err := u.db.QueryRowContext(ctx, query, email).Scan(&user.ID, &user.Name, &user.Email, &user.Password); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrUserNotFound
 		}

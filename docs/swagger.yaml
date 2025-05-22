@@ -1,6 +1,9 @@
 basePath: /api/v1
 definitions:
-  main.CreateEventRequest:
+  gin.H:
+    additionalProperties: {}
+    type: object
+  main.createEventRequest:
     properties:
       date:
         type: string
@@ -19,7 +22,36 @@ definitions:
     - location
     - name
     type: object
-  main.RegisterUserRequest:
+  main.eventResponse:
+    properties:
+      date:
+        type: string
+      description:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: integer
+    type: object
+  main.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  main.loginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  main.registerUserRequest:
     properties:
       email:
         type: string
@@ -33,6 +65,15 @@ definitions:
     - email
     - name
     - password
+    type: object
+  main.userResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
     type: object
   storage.Attendee:
     properties:
@@ -144,6 +185,43 @@ paths:
       summary: Get User
       tags:
       - Users
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user using email and password, and returns a JWT
+        token on success.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/main.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.loginResponse'
+        "400":
+          description: Bad Request - invalid input
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized - invalid credentials
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - BearerAuth: []
+      summary: Login User
+      tags:
+      - Users
   /auth/register:
     post:
       consumes:
@@ -155,14 +233,14 @@ paths:
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/main.RegisterUserRequest'
+          $ref: '#/definitions/main.registerUserRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/storage.User'
+            $ref: '#/definitions/main.userResponse'
         "400":
           description: Bad Request
           schema: {}
@@ -209,7 +287,7 @@ paths:
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/main.CreateEventRequest'
+          $ref: '#/definitions/main.createEventRequest'
       produces:
       - application/json
       responses:
@@ -226,6 +304,8 @@ paths:
         "500":
           description: Internal Server Error
           schema: {}
+      security:
+      - BearerAuth: []
       summary: Create event
       tags:
       - Events
@@ -256,6 +336,8 @@ paths:
         "500":
           description: Internal Server Error
           schema: {}
+      security:
+      - BearerAuth: []
       summary: Delete event
       tags:
       - Events
@@ -298,7 +380,7 @@ paths:
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/main.CreateEventRequest'
+          $ref: '#/definitions/main.createEventRequest'
       - description: Event ID
         in: path
         name: id
@@ -308,9 +390,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Event successfully updated
           schema:
-            $ref: '#/definitions/storage.Event'
+            $ref: '#/definitions/main.eventResponse'
         "400":
           description: Bad Request
           schema: {}
@@ -320,6 +402,8 @@ paths:
         "500":
           description: Internal Server Error
           schema: {}
+      security:
+      - BearerAuth: []
       summary: Update event
       tags:
       - Events
@@ -391,6 +475,8 @@ paths:
         "500":
           description: Internal Server Error
           schema: {}
+      security:
+      - BearerAuth: []
       summary: Delete attendee
       tags:
       - Attendees
@@ -441,7 +527,38 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Add an attendee to an event
       tags:
       - Attendees
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns the health status of the application
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health check successful
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema: {}
+      security:
+      - BasicAuth: []
+      summary: Health Check
+      tags:
+      - Health
+securityDefinitions:
+  BasicAuth:
+    type: basic
+  BearerAuth:
+    description: 'Use a valid JWT token. Format: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
